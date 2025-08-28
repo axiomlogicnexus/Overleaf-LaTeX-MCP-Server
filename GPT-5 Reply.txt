@@ -1,0 +1,165 @@
+High-level assessment: your plan is solid and pragmatic. TypeScript for the core MCP server, a potential Python sidecar for LaTeX tools, and the split between CLSI- and Git-oriented tools are the right calls. Below are targeted additions, potential pitfalls, and concrete refinements to strengthen reliability, usability, and security.
+
+Architecture and execution model
+
+Compile provider abstraction: don’t assume CLSI will be available or stable across deployments. Define a compile provider interface and ship at least two implementations:
+
+CLSI-backed compile
+
+Local compile (latexmk/xelatex) with sandboxing (container or job user) and a package cache
+
+This lets you switch seamlessly per project or environment.
+
+Job queue and coalescing: throttle concurrent compiles and coalesce successive edits to avoid redundant builds. Introduce a per-project debounce window and a global compile queue with priorities.
+
+Storage isolation: isolate working directories per project/session; sanitize paths and block symlinks escaping the workspace. Implement artifact TTL and periodic cleanup.
+
+Artifact delivery: for large files (PDF), avoid embedding base64 in responses. Provide short-lived URLs backed by a simple object store (local disk with an HTTP server, S3-compatible, or presigned links).
+
+Git operations
+
+Prefer system git over nodegit/isomorphic-git: the CLI is more robust and better-tested, especially for auth and merges. Keep a thin wrapper and parse errors. Fall back to libs only if the environment forbids subprocesses.
+
+Auth handling: support:
+
+Overleaf Cloud tokens (username/token or PAT)
+
+Server Pro/SSO variations
+
+Offer credential helpers and explicitly document where secrets are stored. Never log tokens; mask them in traces.
+
+Conflict strategy: provide modes:
+
+fast-forward-only (fail if divergence)
+
+rebase with ours/theirs bias
+
+branch-per-session (recommended for LLM edits to avoid stomping collaborators)
+
+Return a structured merge report to the client.
+
+Large files/LFS: Overleaf often has limitations around LFS. Proactively detect large/binary commits and block or warn with policy.
+
+Compilation and diagnostics
+
+Structured error taxonomy: parse .log into structured diagnostics (error/warn/info, file, line, code). Normalize CLSI vs local output into one schema.
+
+Streaming logs: expose incremental log streaming for long builds, not only final artifacts. This improves LLM feedback loops.
+
+Preflight checks: ship chktex, latexindent, and a fast bespoke validator (for graphics paths, missing figures/bibs, unescaped underscores, etc.). Make these MCP tools first-class:
+
+tex_preflight (already planned)
+
+tex_format (latexindent) with dry-run mode and diff output
+
+tex_lint (chktex) with rule configuration
+
+Shell-escape and security policy: per-project policy for shell-escape, network access, and writeable dirs. Surface violations early with actionable messages.
+
+LaTeX parsing and intelligent editing
+
+Use latex-utensils (TypeScript) for parsing and outlines. It gives AST for sections, labels, citations, environments, useful for:
+
+analyze_structure / tex_outline
+
+delete_section, insert_paragraph, edit_file_line with AST-aware ranges
+
+Cross-references and bibliography:
+
+Tools: cite_lookup (DOI/arXiv/URL → BibTeX via Crossref/ads), check_refs (undefined/unused labels/citations), bib_resolve (as you noted).
+
+Safer patching: adopt a diff+hash format like mcp-text-editor’s patch protocol to prevent drift. Always round-trip through validation (file hash and hunk context) to avoid destructive edits.
+
+MCP tool design and versioning
+
+Stable schemas and versioning: namespace your tools (e.g., overleaf.compile.v1). Add a get_capabilities tool that returns feature flags (CLSI available, shell-escape allowed, async compile supported).
+
+Long-running tasks: standardize async patterns:
+
+Every async tool returns an operationId, with get_operation_status and cancel_operation. Also emit server-sent events where supported.
+
+Limits and chunking: enforce max payload sizes and introduce chunked resource uploads or pre-upload references to avoid oversized MCP messages.
+
+Observability and ops
+
+Structured logs and metrics: use pino (JSON) and expose metrics (Prometheus) for:
+
+compile latency/success, queue depth, cache hit rate, git sync outcomes, failures by category.
+
+Tracing: OpenTelemetry spans for git, compile, patch apply, and artifact upload. Correlate by project_id and operationId.
+
+Idempotency and retries: idempotency keys for compile and patch operations; exponential backoff with jitter for Git and CLSI calls. Classify retryable vs terminal errors.
+
+Health checks: readiness probes should assert external dependencies (git reachable, CLSI reachable or local toolchain available).
+
+Security and policy
+
+Secrets management: load via env/secret store; validate on boot; never write secrets to logs. Provide a project-level credential store abstraction.
+
+Policy enforcement: pre-receive emulation to block disallowed files, enforce main.tex presence, reject large binaries, enforce line-ending policy, and optionally auto-run format/lint before accept.
+
+Sandbox local compiles: run latexmk under a restricted user or container with network off by default; whitelist graphics/include paths.
+
+Developer experience and testing
+
+Representative fixtures: include a suite of sample projects (basic article, beamer, thesis, heavy biblatex/biber, minted/shell-escape, TikZ-heavy).
+
+Golden tests:
+
+Preflight: deterministic log snapshots
+
+Compile: assert warnings/error classes rather than binary PDF bytes (which are nondeterministic)
+
+Git flows: simulate conflict scenarios with scripted repos
+
+Dry-run modes: for risky actions (delete_section, auto_format), return proposed diffs and a risk score before making changes.
+
+Workflow enhancements
+
+Session branches: create a branch per LLM session; push PR-style back to main upon user confirmation, with compiled artifact linked. Reduces surprise overwrites.
+
+Compile-on-push with annotations: attach compile status and a link to the PDF/log to the git notes or commit metadata you return to clients.
+
+Debounced compile-after-patch: allow the client to batch multiple edits and then trigger a compile explicitly or after a short idle timeout.
+
+Windows-specific caveats (your current environment)
+
+latexindent (Perl) and chktex availability on Windows need validation; consider a Dockerized toolchain or WSL. If not feasible, gate these tools and detect availability at runtime.
+
+Ensure path normalization and encoding handling for TeX (UTF-8 defaults and BOM issues).
+
+Concrete tool list refinement
+
+Compile: compile_latex (sync), compile_latex_async, get_compile_status, get_compile_artifact
+
+Git: git_clone_overleaf, git_pull_push, git_commit_patch (with patch validation), git_create_session_branch
+
+Text/structure: tex_outline (latex-utensils), search_content, edit_file_line (hash-validated), delete_section, insert_paragraph
+
+Quality: tex_preflight, tex_lint (chktex), tex_format (latexindent dry-run/apply), check_refs, bib_resolve, cite_lookup
+
+Ops: get_capabilities, get_health, get_metrics, cancel_operation
+
+Potential complaints or watch-outs
+
+nodegit complexity and footprint; prefer system git.
+
+Over-reliance on CLSI availability; mitigate with the compile provider abstraction.
+
+Returning large base64 artifacts over MCP; prefer URLs with TTL.
+
+LLM-driven whole-file rewrites; enforce patch-based workflows with conflict detection and guardrails.
+
+Missing persistent policy layer; define per-project policies and enforce them early.
+
+Insufficient concurrency control; add a queue and coalescing to keep compiles under control.
+
+If you want next steps, I can provide a minimal TypeScript server skeleton with:
+
+Tool registration for compile_latex(_async), git_commit_patch, tex_outline
+
+A compile provider interface with a local latexmk implementation stub
+
+Pino logging, Prometheus metrics, and OpenTelemetry wiring
+
+A simple file-backed object store for artifact TTL URLs

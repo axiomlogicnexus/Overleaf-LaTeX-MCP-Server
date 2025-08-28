@@ -1,0 +1,143 @@
+Your docs and tools directory show you’ve sketched out the high-level pieces, but the plan as it stands is still very skeletal. Here are concrete gaps and “I-wish-you’d”s before you lock it in:
+
+1. ARCHITECTURE.md is empty
+
+– Add a clear system diagram (Client → API Gateway → Auth → Queue → Worker → Storage) plus component responsibilities.
+
+– Document your sandboxing layer, cache tier, and how the LaTeX engine lives in its own container/VM.
+
+– Spell out failure modes: what happens when a job exceeds time/memory, or the worker pod crashes?
+
+2. API.md only has a title
+
+– Define each REST/WebSocket endpoint: paths, methods, payload schemas, status codes.
+
+– Include your signed-URL convention (project_id + HMAC + expiry), plus examples.
+
+– Describe the real-time log stream (WebSocket subprotocol or SSE), its framing, and error messages.
+
+3. ROADMAP.md is blank
+
+– Break out versions:
+
+• v0.1 local single-tenant compile & preview
+
+• v0.2 durable queue + incremental cache
+
+• v0.3 multi-tenant RBAC + quotas
+
+• v1.0 production hardening (SLA, autoscale, observability)
+
+– Tie each milestone back to your docs (e.g. “By v0.2 we’ll have Prometheus metrics in place.”)
+
+4. global_rules.md
+
+– I’d expect to see your default resource caps (e.g. 2 min CPU, 512 MiB RAM), plus disallowed shell-escape by default.
+
+– State your maximum project and file sizes up-front.
+
+5. overleaf_tools.py
+
+– Good start, but it mixes CLI-style errors with tool return strings. Consider returning structured data (e.g. dict with “status”, “path”, “errors”) so consumers can programmatically detect failure.
+
+– Add logging around each step and catch finer-grained exceptions (bad zip, permission errors, path traversal).
+
+– Write unit tests for corner cases: empty zip, nested directories, missing write permissions, large files.
+
+6. Missing cross-cutting concerns
+
+– Authentication/authorization: your tools take raw paths today. You’ll need to canonicalize and verify tenant ownership.
+
+– Observability: no metrics or request IDs in tools. Add hooks to increment counters and tag logs.
+
+– Security: no mention of scanning incoming zips for zip-slip attacks or disallowed file types.
+
+– Extensibility: if you plan hooks for spell-check or PDF annotation, document your plugin contract in the architecture.
+
+Filling in those sections before coding will save you painful rewrites. Once your docs have these details, you’ll have a solid foundation for implementation and QA.
+
+The sketches you’ve collected from Grok, GPT-5, Claude and Gemini are all on target—your core decisions (TypeScript + optional Python sidecar; CLSI vs Git surfaces; MCP tool façade) are sound. What’s missing now is filling in the “plumbing” and locking down consistency, security and operability before you write another line of business logic.
+
+1. EMPTY DOCS
+
+• ARCHITECTURE.md • API.md • ROADMAP.md are placeholders. Populate them now with:
+
+– Component diagram and data‐flow (Client → MCP → Queue → CompileProvider → ArtifactStore → Storage).
+
+– REST/WebSocket endpoint definitions (paths, methods, JSON schemas, status codes).
+
+– Milestones broken into phases (v0.1–v1.0).
+
+2. COMPILE PROVIDER ABSTRACTION
+
+• Define a CompileProvider interface with at least two implementations:
+
+– CLSIProvider (HTTP(s) to Overleaf CLSI).
+
+– LocalProvider (latexmk in sandbox/container, no shell-escape, resource caps from global_rules.md).
+
+• Wire compile_latex / compile_latex_async to this interface.
+
+3. WORKSPACE & QUEUE
+
+• WorkspaceManager: per-project (and per-session) root-confined dirs; path.resolve + containment checks everywhere.
+
+• JobQueue + debounce/coalescing: jobs go onto a durable queue (BullMQ/Redis or even a local in-memory stub for v0.1), with per-project debounce window to collapse rapid edits.
+
+4. TOOL RETURNS & ERROR HANDLING
+
+• Never return raw strings for success/failure—return structured JSON:
+
+{ status: “ok”|“error”, data?:…, errors?: […] }
+
+• Parse .log into typed diagnostics (file, line, severity, message).
+
+5. GIT SESSION WORKFLOW
+
+• git_start_session → clones Overleaf remote, checks out mcp-session/{uuid}.
+
+• git_commit_patch → hash-validated patch apply; rejects if drift.
+
+• git_pull_push → rebase or fast-forward only, per policy.
+
+• git_propose_merge/git_merge_session → PR-style merge, never force-push main.
+
+6. ARTIFACT STORE
+
+• Dump large outputs (PDF, logs) to a temp/object store, return short-lived signed URLs (no base64 blobs).
+
+• Cleanup via TTL background job.
+
+7. SECURITY & GLOBAL RULES
+
+• Enforce path normalization + workspace-root containment in a single helper used by all tools.
+
+• spawn(cmd, args, { shell: false }) for every subprocess; network off by default; shell-escape disabled unless explicitly allowed.
+
+• Load all secrets from env/secret store; mask them in logs.
+
+8. OBSERVABILITY
+
+• JSON‐structured logging (pino) with requestId, projectId, operationId.
+
+• Prometheus metrics for queue_depth, compile_duration_seconds, compile_memory_bytes, git_errors.
+
+• OpenTelemetry spans around compile & git calls.
+
+9. DOCUMENTATION AUTOMATION
+
+• dev_generate_api_docs tool or script to introspect registered MCP tools + schemas and regenerate API.md on each build.
+
+• Commit‐lint hook (Conventional Commits) to update CHANGELOG.md per release.
+
+10. PHASED ROADMAP
+
+• Phase 0.1 (bootstrap): local compile, manual queue, single‐tenant.
+
+• Phase 0.2 (core): async compile, CLSIProvider, artifact store, metrics.
+
+• Phase 0.3 (multi-tenant + git): session branches, patch validation, policy enforcement.
+
+• v1.0 (hardening): sandbox containers, rate-limit, autoscale, SLA docs, full test suite with sample LaTeX fixtures.
+
+Without these foundations in place, higher-level tools (cite_lookup, delete_section, auto_format, etc.) will either leak security holes or require painful refactors.  Shore up the docs, abstractions, queue & workspace plumbing, security rails and observability first—then build the “smarts” on top.

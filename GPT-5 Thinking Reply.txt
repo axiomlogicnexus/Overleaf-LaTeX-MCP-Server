@@ -1,0 +1,89 @@
+High-signal review based on your current repo and the five prior write-ups:
+
+Critical gaps to address before further coding
+
+Docs are empty: ARCHITECTURE.md, API.md, ROADMAP.md need concrete content now to prevent drift. Include component diagram, data-flow, JSON schemas, error codes, and phased milestones.
+
+Compile pipeline missing: no CompileProvider abstraction, no CLSI vs local compile switch, no async operations, no queue/debounce, no artifact store.
+
+Git workflow missing: no session-branch model, no hash-validated patching, no conflict strategy (ff-only/rebase), no pre-receive policy checks.
+
+Security posture incomplete: no path containment helper used across tools, no secret masking/logging policy, no sandboxed local compile, no rate limits, no shell-escape policy enforcement.
+
+Observability missing: no structured logging, metrics, or tracing.
+
+Return types: tools return unstructured strings; adopt a consistent structured shape across all tools.
+
+Concrete improvements to the current Python module (overleaf_mcp/tools/overleaf_tools.py)
+
+Replace string returns with structured JSON-like dicts: { status: "ok" | "error", data: {...}, errors: [{code, message, details}] }.
+
+Enforce path safety: resolve() + workspace-root containment for every path. Reject on traversal or symlinks escaping root.
+
+Zip extraction hardening: defend against zip-slip, size limits, file count limits, and disallowed extensions; validate total uncompressed size.
+
+Unsupported file logic: treat .aux/.log as ignorable artifacts rather than “unsupported” errors; ensure export excludes ephemeral outputs.
+
+scan limits: the current “first 10 .tex files” heuristic in check_overleaf_compatibility risks false negatives. Add a fast pass (count/size/type indices) then chunked scanning with time budget, returning “truncated: true” when capped.
+
+Logging: add request-id/project-id context to each tool, and classify error types (io_error, bad_zip, path_violation).
+
+Unit tests: empty zip, malicious zip paths, large files >50MB, missing write perms, projects with no main .tex, and image path typos.
+
+MCP tool surface to lock down (v1)
+
+Compile: compile_latex, compile_latex_async, get_compile_status, cancel_operation, get_compile_artifact.
+
+Git: git_start_session (branch mcp-session/uuid), git_commit_patch (hash-validated hunks), git_pull_push (ff-only/rebase policy), git_propose_merge.
+
+LaTeX intelligence: tex_outline, tex_preflight, tex_lint (chktex), tex_format (latexindent dry-run + diff), check_refs, bib_resolve, cite_lookup.
+
+Ops: get_capabilities (providers, policies, limits), get_health, get_metrics.
+
+Foundational architecture decisions
+
+CompileProvider interface: CLSIProvider and LocalProvider (latexmk) behind a queue worker. Local provider runs in a sandbox with network disabled and shell-escape off by default.
+
+Job queue & coalescing: per-project debounce window and hash-dedupe; worker concurrency caps; durable store if you expect restarts.
+
+ArtifactStore: persist PDF/log/synctex and return short-lived signed URLs; periodic TTL cleanup.
+
+WorkspaceManager: per-project/session isolated directories; immutable input copy + writable build dir; strict containment checks.
+
+Error taxonomy: normalized errors for compile/log parse (file, line, severity, code), CLSI vs local mapped into one schema.
+
+Security/policy enforcement
+
+Single path-validation helper used everywhere; reject on traversal, symlink escapes, or policy violations.
+
+spawn with args arrays only; never shell: true.
+
+Per-project policies in config: allowed compilers, shell-escape mode, max file size/count, network access for local compiles.
+
+Pre-receive emulation on push/commit: block large binaries, require main.tex, enforce line-endings, optionally auto-run lint/format.
+
+Observability and ops
+
+Structured logs (JSON) with request-id, project-id, operation-id.
+
+Metrics: compile_duration_seconds, queue_depth, compile_memory_bytes, git_sync_errors_total, artifact_store_bytes.
+
+Tracing: spans around git, compile, artifact writes; correlate via operation-id.
+
+Documentation and governance
+
+API.md generated from tool schemas (dev_generate_api_docs), with example payloads and error shapes.
+
+ROADMAP.md with phases: 0.1 bootstrap (LocalProvider + minimal queue), 0.2 async + CLSI + artifact store + metrics, 0.3 git session workflow + policies + patch validation, 1.0 sandbox/hardening/tests/SLA.
+
+global_rules.md: add explicit resource caps (CPU, MEM, wall time), rate limits, and secret-handling policy.
+
+Windows-specific cautions
+
+chktex and latexindent availability: prefer Docker/WSL for local compile/lint to avoid platform drift; gate tools if binaries missing.
+
+Normalize encoding to UTF-8; handle BOM; backslash path handling for TeX on Windows.
+
+Bottom line
+
+The plan is correct; the missing pieces are the “hard edges”: provider abstraction, queue, artifact store, session-branch git with patch validation, strict security rails, and unified schemas/observability. Implement these foundations and your higher-level tools (section manipulation, bibliography helpers, compile-on-push) will be reliable, secure, and maintainable.

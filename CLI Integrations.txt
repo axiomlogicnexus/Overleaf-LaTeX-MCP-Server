@@ -1,0 +1,64 @@
+Short answer
+
+Keep almost everything in the TypeScript core.
+Use a Python sidecar only for LaTeX-specific CLI integrations and PDF utilities where Python libraries are clearly superior.
+Avoid wrapping package installation or desktop editor integration in the server.
+Recommended split
+
+Use Python sidecar
+
+lint.chktex
+Reason: Well-supported CLI; Python can provide robust parsing to structured diagnostics (severity, file, line, code). Gate by availability and run in container/WSL on Windows.
+format.latexindent
+Reason: latexindent is Perl and finicky on Windows; a Python wrapper can normalize invocation, handle encodings, and return a unified patch/diff.
+pdf.optimize, pdf.info
+Reason: Python has pikepdf, qpdf bindings, and reliable Ghostscript wrappers; easier to implement cross-platform PDF metadata/optimization workflows with better fidelity and fewer quirks than Node-only options.
+Keep in TypeScript core
+
+latex.compile, latex.clean
+Orchestrate via a CompileProvider abstraction (LocalProvider using latexmk in a sandbox or CLSIProvider). Keep control plane, queueing, and streaming logs in Node for consistent async/eventing.
+latex.compile_container, latex.clean_container, container.info
+Container orchestration should stay in Node (dockerode or CLI via spawn with args). Keep one orchestration surface and enforce policy/sandboxing centrally.
+detect_toolchain, tex.dist_info, tex.kpsewhich, tex.texdoc, tex.pkg_info
+Probe via child_process spawn with args; normalize to structured results. Avoid shell: true.
+project.scaffold, project.detect_root, project.graph, project.out_of_date
+Use latex-utensils in Node for AST/structure, graph refs/includes, and stale-file detection.
+bib.build
+Trigger via latexmk/biber/bibtex as part of compile pipeline; keep diagnostics normalized under the same CompileProvider schema.
+forward_search.hint
+Parse synctex.gz in Node (zlib + small parser or a library) to map (file,line)->(page,coords). This benefits from the same event loop and avoids cross-process calls for interactive features.
+watch.start, watch.stop, watch.list, watch.tail
+File watching and log tailing belong in Node’s event loop; natural fit with MCP/WebSocket events.
+config.show, config.validate, config.reload
+Centralized configuration management/policies belong in the core.
+health.check
+Single surface for health/metrics; keep in core.
+text.replace, text.apply_patch
+Implement robust, hash-validated patching (mcp-text-editor style) in Node to minimize cross-language latency and guarantee consistency with the workspace manager.
+files.copy_into_workspace, snippet.insert
+File I/O stays inside the workspace manager in Node for path containment and policy enforcement.
+Avoid or gate carefully
+
+tex.pkg_install
+Prefer not to expose package installation at runtime due to security and reproducibility concerns. If ever enabled, scope to a sandboxed container with explicit policy, never host-wide tlmgr.
+texstudio.open
+Desktop/editor integration should not be part of a headless server surface. If needed for local dev tooling, keep it as an opt-in local utility, not an MCP tool.
+session.save, session.restore
+Keep in Node (persisted JSON state/metadata). Adding Python here increases moving parts without gaining capability.
+Why this split
+
+Keep one control plane for jobs, queues, policies, workspace containment, and MCP/WebSocket events (Node/TypeScript).
+Use Python only where it delivers clear wins: LaTeX lint/format and PDF tooling. Everything else is process orchestration or AST/log parsing that fits better with Node’s async model and existing TypeScript libraries.
+Fewer cross-process round trips = better performance and simpler error handling. The sidecar should expose a minimal RPC surface: chktex, latexindent, pdf.info/optimize.
+Implementation notes
+
+Capability detection: expose a get_capabilities tool that tells clients whether chktex/latexindent/pdf tooling is available (Windows/WSL/container).
+Security: enforce path containment and policies in the Node core; sidecar receives only normalized, workspace-internal paths and bounded inputs. Never allow shell: true. Always use spawn with args arrays and timeouts.
+Observability: centralize logs/metrics/tracing in Node; sidecar logs flow back as structured child-operation spans.
+Windows considerations: prefer containerized compilation; if WSL/Docker unavailable, gate sidecar tools off and document degraded capabilities.
+Net result
+
+You keep a single robust Node-based MCP server for orchestration, async operations, Git, and document intelligence (via latex-utensils).
+Python sidecar remains optional and focused: lint, format, PDF utilities. This yields better portability, simpler ops, and cleaner security boundaries without sacrificing LaTeX-specific power where it matters.
+
+config.show; detect_toolchain; texstudio.open returns; latex.compile; latex.clean; project.scaffold; lint.chktex; format.latexindent; bib.build; forward_search.hint; watch.start; watch.stop; watch.list; watch.tail; project.detect_root; project.graph; project.out_of_date; health.check; tex.dist_info; tex.kpsewhich; tex.texdoc; tex.pkg_info; tex.pkg_install; pdf.optimize; session.save; session.restore; container.info; latex.compile_container; latex.clean_container ; pdf.info; config.show ; config.validate; config.reload; text.replace;  text.apply_patch; files.copy_into_workspace; snippet.insert 
