@@ -40,7 +40,7 @@ _build/
 .cache/
 
 # Generated docs/backups
-Documentation/
+docs/
 **/*~
 
 # LaTeX build artifacts
@@ -93,9 +93,9 @@ Documentation/
 *.temp
 .tmp/
 
-# Artifacts and workspace
-artifacts/
-workspaces/
+# Artifacts and workspace (top-level only)
+/artifacts/
+/workspaces/
 
 # Local config/secrets (do not commit)
 projects.json
