@@ -4,6 +4,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import http from 'node:http';
 import { ArtifactStore } from './core/artifacts/ArtifactStore';
+import { WorkspaceManager } from './core/workspace/WorkspaceManager';
+import { OperationManager } from './core/operations/OperationManager';
+import { CompileService } from './core/compile/CompileService';
+import { getTextFileContents, patchTextFileContents } from './core/text/TextTools';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -77,11 +81,29 @@ async function main() {
   const health = await healthCheck(workspacesDir, artifactsDir);
   logger.info({ msg: 'Health check', health });
 
-  // Minimal HTTP handler for artifacts and health/capabilities (optional)
+  // Instantiate services
+  const workspaces = new WorkspaceManager(workspacesDir);
   const artifactStore = new ArtifactStore(artifactsDir, 60 * 60 * 1000);
+  const ops = new OperationManager<any, any>();
+  const compileService = new CompileService(workspaces, artifactStore);
+
+  // Minimal HTTP handler for artifacts and health/capabilities (optional)
   const server = http.createServer(async (req, res) => {
     try {
       if (!req.url) { res.statusCode = 404; res.end(); return; }
+
+      // helper to read JSON body
+      const readJson = async <T = any>(): Promise<T> => {
+        const chunks: Buffer[] = [];
+        await new Promise<void>((resolve, reject) => {
+          req.on('data', (d) => chunks.push(Buffer.from(d)));
+          req.on('end', () => resolve());
+          req.on('error', reject);
+        });
+        const raw = Buffer.concat(chunks).toString('utf-8') || '{}';
+        try { return JSON.parse(raw) as T; } catch { throw new Error('invalid_json'); }
+      };
+
       if (req.method === 'GET' && req.url.startsWith('/artifacts/')) {
         const id = req.url.split('/').pop() as string;
         const ref = artifactStore.get(id);
@@ -92,6 +114,81 @@ async function main() {
         res.end(data);
         return;
       }
+      if (req.method === 'POST' && req.url === '/compile') {
+        try {
+          const body = await readJson<{ projectId: string; rootResourcePath: string; options?: any }>();
+          await workspaces.ensureWorkspace(body.projectId);
+          const out = await compileService.compileSync(body.projectId, body.rootResourcePath, body.options || {});
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'ok', data: { diagnostics: out.result.diagnostics, artifacts: out.artifacts } }));
+        } catch (e: any) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'error', errors: [{ code: 'compile_failed', message: String(e?.message || e) }] }));
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && req.url === '/compileAsync') {
+        try {
+          const body = await readJson<{ projectId: string; rootResourcePath: string; options?: any }>();
+          await workspaces.ensureWorkspace(body.projectId);
+          const operationId = compileService.compileAsync(body.projectId, body.rootResourcePath, body.options || {}, ops);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'ok', data: { operationId } }));
+        } catch (e: any) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'error', errors: [{ code: 'compile_failed', message: String(e?.message || e) }] }));
+        }
+        return;
+      }
+
+      if (req.method === 'GET' && req.url.startsWith('/compileStatus')) {
+        const u = new URL(req.url, 'http://localhost');
+        const id = u.searchParams.get('operationId') || '';
+        const op = ops.get(id);
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        if (!op) { res.end(JSON.stringify({ status: 'error', errors: [{ code: 'not_found', message: 'operation not found' }] })); return; }
+        res.end(JSON.stringify({ status: 'ok', data: op }));
+        return;
+      }
+
+      if (req.method === 'POST' && req.url === '/text/get') {
+        try {
+          const body = await readJson<{ projectId: string; filePath: string; ranges?: { start: number; end: number }[] }>();
+          const ws = await workspaces.ensureWorkspace(body.projectId);
+          const out = await getTextFileContents(ws, body.filePath, body.ranges);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'ok', data: out }));
+        } catch (e: any) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'error', errors: [{ code: 'text_get_failed', message: String(e?.message || e) }] }));
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && req.url === '/text/patch') {
+        try {
+          const body = await readJson<{ projectId: string; filePath: string; baseHash: string; patches: { startLine: number; endLine: number; expectedHash: string; newText: string }[] }>();
+          const ws = await workspaces.ensureWorkspace(body.projectId);
+          const out = await patchTextFileContents(ws, body.filePath, body.baseHash, body.patches);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'ok', data: out }));
+        } catch (e: any) {
+          res.statusCode = 409;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'error', errors: [{ code: 'text_patch_failed', message: String(e?.message || e) }] }));
+        }
+        return;
+      }
+
       if (req.method === 'GET' && req.url === '/health') {
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
