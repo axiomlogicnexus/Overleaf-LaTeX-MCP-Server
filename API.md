@@ -78,7 +78,7 @@ Patch shape (hash-validated, mcp-text-editor style):
   - Input: `{ projectId: string, filePath: string, sectionTitle?: string }`
   - Output: `{ sections: SectionNode[] }` or `{ section: SectionNode, content: string }`
 
-- create_section | insert_paragraph | edit_file_line | delete_section
+- create_section | insert_paragraph | edit_file_line | delete_section | create_document | create_equation | create_table | create_figure | fix_errors
   - Input: operation-specific; all return updated hashes and ranges modified.
 
 - auto_format

@@ -72,6 +72,7 @@ Phase 0.4 – LaTeX preflight and structured edits (accuracy and UX)
 - AST-aware content ops
   - get_sections, get_section_content
   - create_section, insert_paragraph, edit_file_line, delete_section
+  - create_document, create_equation, create_table, create_figure
   - analyze_structure (tree of sections, figures, tables, equations)
   - auto_format (formatting using parser + latexindent)
 - Bibliography
