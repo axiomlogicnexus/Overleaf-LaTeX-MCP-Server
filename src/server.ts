@@ -2,6 +2,8 @@ import pino from 'pino';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import http from 'node:http';
+import { ArtifactStore } from './core/artifacts/ArtifactStore';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -74,6 +76,43 @@ async function main() {
 
   const health = await healthCheck(workspacesDir, artifactsDir);
   logger.info({ msg: 'Health check', health });
+
+  // Minimal HTTP handler for artifacts and health/capabilities (optional)
+  const artifactStore = new ArtifactStore(artifactsDir, 60 * 60 * 1000);
+  const server = http.createServer(async (req, res) => {
+    try {
+      if (!req.url) { res.statusCode = 404; res.end(); return; }
+      if (req.method === 'GET' && req.url.startsWith('/artifacts/')) {
+        const id = req.url.split('/').pop() as string;
+        const ref = artifactStore.get(id);
+        if (!ref) { res.statusCode = 404; res.end('Not Found'); return; }
+        const data = await fs.readFile(ref.path);
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.end(data);
+        return;
+      }
+      if (req.method === 'GET' && req.url === '/health') {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ status: 'ok', checks: await healthCheck(workspacesDir, artifactsDir) }));
+        return;
+      }
+      if (req.method === 'GET' && req.url === '/capabilities') {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ status: 'ok', data: await getCapabilities() }));
+        return;
+      }
+      res.statusCode = 404;
+      res.end('Not Found');
+    } catch (e: any) {
+      res.statusCode = 500;
+      res.end('Internal Server Error');
+    }
+  });
+  const port = Number(process.env.PORT || 8080);
+  server.listen(port, () => logger.info({ msg: 'HTTP server listening', port }));
 
   // TODO: Register MCP tools, wire providers, queue, artifact store
   process.on('SIGINT', () => {
