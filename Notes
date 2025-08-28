@@ -1,9 +1,3 @@
-Approved! Language choice: TypeScript/Node.js. 1. I want you to generate a roadmap of milestones, from most relevant and easy to implement to least relevant and difficult to implement, begotten from the context discussed above, but make sure not to omit a single feature. 2. Create a codebase in the project folder. 3. Read, strictly adhere to and then update global_rules.md with project relevant information. Also update ARCHITECTURE.md, API.md, PRD.md, DEVELOPMENT.md, and CHANGELOG.md. 4. Create a comprehensive .gitignore file and then stage and push project to following repo: https://github.com/axiomlogicnexus/Overleaf-LaTeX-MCP-Server.git
-
-
-
-3. I want you to provide a step by step ToDo List guide. I will crosscheck approach with other AIs. Once approved I want you to create codebase in current Project Folder.
-
 Strong MCP SDK support, async model, structured logging, schema validation, Git CLI integration, and good WebSocket/HTTP stack.
 We’ll implement abstractions: CompileProvider (CLSI vs Local), WorkspaceManager, JobQueue, ArtifactStore, and Git wrapper (system git CLI via spawn with args array).
 Sidecar: Python (optional)
@@ -11,5 +5,5 @@ Only for LaTeX-specific lint/format utilities (chktex, latexindent) when availab
 Security and ops patterns (immediate)
 Path containment, no shell: true, secrets masking, structured JSON tool responses, metrics/logging/tracing from day one.
 
-config.show; detect_toolchain; texstudio.open returns; latex.compile; latex.clean; project.scaffold; lint.chktex; format.latexindent; bib.build; forward_search.hint; watch.start; watch.stop; watch.list; watch.tail; project.detect_root; project.graph; project.out_of_date; health.check; tex.dist_info; tex.kpsewhich; tex.texdoc; tex.pkg_info; tex.pkg_install; pdf.optimize; session.save; session.restore; container.info; latex.compile_container; latex.clean_container ; pdf.info; config.show ; config.validate; config.reload; text.replace;  text.apply_patch; files.copy_into_workspace; snippet.insert 
+
 
