@@ -1,9 +1,0 @@
-Strong MCP SDK support, async model, structured logging, schema validation, Git CLI integration, and good WebSocket/HTTP stack.
-We’ll implement abstractions: CompileProvider (CLSI vs Local), WorkspaceManager, JobQueue, ArtifactStore, and Git wrapper (system git CLI via spawn with args array).
-Sidecar: Python (optional)
-Only for LaTeX-specific lint/format utilities (chktex, latexindent) when available. On Windows, prefer running via WSL/Docker, or gate them at runtime and expose capability flags to the client.
-Security and ops patterns (immediate)
-Path containment, no shell: true, secrets masking, structured JSON tool responses, metrics/logging/tracing from day one.
-
-
-
