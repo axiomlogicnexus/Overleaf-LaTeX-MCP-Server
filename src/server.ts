@@ -9,9 +9,15 @@ import { OperationManager } from './core/operations/OperationManager';
 import { CompileService } from './core/compile/CompileService';
 import { getTextFileContents, patchTextFileContents } from './core/text/TextTools';
 import { loadConfig, resolvePolicy, isAllowedExtension } from './core/config/Config';
+import { GitClient } from './core/git/GitClient';
 import { Metrics } from './core/metrics/Metrics';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+
+function cryptoRandom() {
+  // Not cryptographically strong; acceptable for branch suffixes
+  return Math.random().toString(36).slice(2, 10);
+}
 
 async function run(cmd: string, args: string[], cwd?: string, timeoutMs = 5000): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
@@ -118,6 +124,68 @@ async function main() {
         res.end(data);
         return;
       }
+      if (req.method === 'POST' && req.url === '/git/startSession') {
+        try {
+          const body = await readJson<{ projectId: string; remoteUrl: string; branch?: string }>();
+          const ws = await workspaces.ensureWorkspace(body.projectId);
+          // If workspace not a repo: clone, else set remote and fetch
+          const git = new GitClient(ws);
+          if (!(await git.isRepo())) {
+            await GitClient.clone(body.remoteUrl, ws);
+          } else {
+            await git.setRemote('origin', body.remoteUrl);
+            await git.fetch('origin');
+          }
+          const sessionBranch = body.branch || `mcp-session/${cryptoRandom()}`;
+          await git.checkoutBranch(sessionBranch);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'ok', data: { branch: sessionBranch } }));
+        } catch (e: any) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'error', errors: [{ code: 'git_start_failed', message: String(e?.message || e) }] }));
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && req.url === '/git/commitPatch') {
+        try {
+          const body = await readJson<{ projectId: string; message: string }>();
+          const ws = await workspaces.ensureWorkspace(body.projectId);
+          const git = new GitClient(ws);
+          await git.addAll();
+          await git.commit(body.message);
+          const sha = await git.headSha();
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'ok', data: { commit: sha } }));
+        } catch (e: any) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'error', errors: [{ code: 'git_commit_failed', message: String(e?.message || e) }] }));
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && req.url === '/git/pullPush') {
+        try {
+          const body = await readJson<{ projectId: string; mode?: 'ff-only' | 'rebase' }>();
+          const ws = await workspaces.ensureWorkspace(body.projectId);
+          const git = new GitClient(ws);
+          if (body.mode === 'rebase') await git.pullRebase('origin'); else await git.pullFFOnly('origin');
+          await git.push('origin');
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'ok', data: { pushed: true } }));
+        } catch (e: any) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'error', errors: [{ code: 'git_pull_push_failed', message: String(e?.message || e) }] }));
+        }
+        return;
+      }
+
       if (req.method === 'GET' && req.url === '/metrics') {
         res.statusCode = 200;
         res.setHeader('Content-Type', 'text/plain; version=0.0.4');
