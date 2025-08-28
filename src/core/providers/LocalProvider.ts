@@ -49,22 +49,27 @@ function parseDiagnostics(log: string): Diagnostic[] {
   const lines = log.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    // Error lines in TeX usually start with '!' and may be followed by 'l.<num>'
     if (line.startsWith('!')) {
-      // LaTeX error line, try to capture following context
       const message = line.replace(/^!\s*/, '').trim();
-      // Try to find a file/line hint in the next few lines
-      let file: string | undefined;
       let ln: number | undefined;
-      for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
-        const m = lines[j].match(/l\.(\d+)/);
-        if (m) {
-          ln = Number(m[1]);
-          break;
-        }
+      let fn: string | undefined;
+      // Search next few lines for line info or filename hints (e.g., ./file.tex:line)
+      for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+        const l = lines[j];
+        const m1 = l.match(/l\.(\d+)/);
+        if (m1) { ln = Number(m1[1]); break; }
+        const m2 = l.match(/^(?:\.\/)?([^:]+\.tex):(\d+)/);
+        if (m2) { fn = m2[1]; ln = Number(m2[2]); break; }
       }
-      diags.push({ severity: 'error', file, line: ln, message });
-    } else if (/^LaTeX Warning:/.test(line)) {
-      diags.push({ severity: 'warning', message: line.replace(/^LaTeX Warning:\s*/, '') });
+      diags.push({ severity: 'error', file: fn, line: ln, message });
+      continue;
+    }
+    // Standard LaTeX warning lines
+    const warn = line.match(/^LaTeX Warning:\s*(.*)$/);
+    if (warn) {
+      diags.push({ severity: 'warning', message: warn[1] });
+      continue;
     }
   }
   if (diags.length === 0) {

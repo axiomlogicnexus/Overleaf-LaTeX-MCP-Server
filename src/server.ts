@@ -11,6 +11,7 @@ import { getTextFileContents, patchTextFileContents } from './core/text/TextTool
 import { loadConfig, resolvePolicy, isAllowedExtension } from './core/config/Config';
 import { GitClient } from './core/git/GitClient';
 import { Metrics } from './core/metrics/Metrics';
+import { scanWorkspaceForPolicy } from './core/policy/PolicyEnforcer';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -154,6 +155,17 @@ async function main() {
           const body = await readJson<{ projectId: string; message: string }>();
           const ws = await workspaces.ensureWorkspace(body.projectId);
           const git = new GitClient(ws);
+          // Policy: scan for large files before committing
+          {
+            const policy = resolvePolicy(body.projectId, appConfig);
+            const violations = await scanWorkspaceForPolicy(ws, policy);
+            if (violations.length) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ status: 'error', errors: violations.map(v => ({ code: v.code, message: v.message, details: { path: v.path, sizeBytes: v.sizeBytes } })) }));
+              return;
+            }
+          }
           await git.addAll();
           await git.commit(body.message);
           const sha = await git.headSha();
