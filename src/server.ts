@@ -8,6 +8,8 @@ import { WorkspaceManager } from './core/workspace/WorkspaceManager';
 import { OperationManager } from './core/operations/OperationManager';
 import { CompileService } from './core/compile/CompileService';
 import { getTextFileContents, patchTextFileContents } from './core/text/TextTools';
+import { loadConfig, resolvePolicy, isAllowedExtension } from './core/config/Config';
+import { Metrics } from './core/metrics/Metrics';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -86,6 +88,8 @@ async function main() {
   const artifactStore = new ArtifactStore(artifactsDir, 60 * 60 * 1000);
   const ops = new OperationManager<any, any>();
   const compileService = new CompileService(workspaces, artifactStore);
+  const metrics = new Metrics();
+  const appConfig = await loadConfig(root);
 
   // Minimal HTTP handler for artifacts and health/capabilities (optional)
   const server = http.createServer(async (req, res) => {
@@ -114,11 +118,24 @@ async function main() {
         res.end(data);
         return;
       }
+      if (req.method === 'GET' && req.url === '/metrics') {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'text/plain; version=0.0.4');
+        res.end(metrics.renderProm());
+        return;
+      }
+
       if (req.method === 'POST' && req.url === '/compile') {
         try {
           const body = await readJson<{ projectId: string; rootResourcePath: string; options?: any }>();
+          const start = Date.now();
           await workspaces.ensureWorkspace(body.projectId);
+          // Enforce policy: file extension check
+          const policy = resolvePolicy(body.projectId, appConfig);
+          if (!isAllowedExtension(body.rootResourcePath, policy)) throw new Error('disallowed_extension');
           const out = await compileService.compileSync(body.projectId, body.rootResourcePath, body.options || {});
+          metrics.inc('compile_requests_total');
+          metrics.observe('compile_duration_ms', Date.now() - start);
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ status: 'ok', data: { diagnostics: out.result.diagnostics, artifacts: out.artifacts } }));
@@ -134,7 +151,10 @@ async function main() {
         try {
           const body = await readJson<{ projectId: string; rootResourcePath: string; options?: any }>();
           await workspaces.ensureWorkspace(body.projectId);
+          const policy = resolvePolicy(body.projectId, appConfig);
+          if (!isAllowedExtension(body.rootResourcePath, policy)) throw new Error('disallowed_extension');
           const operationId = compileService.compileAsync(body.projectId, body.rootResourcePath, body.options || {}, ops);
+          metrics.inc('compile_async_requests_total');
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ status: 'ok', data: { operationId } }));
@@ -157,10 +177,32 @@ async function main() {
         return;
       }
 
+      if (req.method === 'GET' && req.url.startsWith('/files')) {
+        const u = new URL(req.url, 'http://localhost');
+        const projectId = u.searchParams.get('projectId') || '';
+        const ext = u.searchParams.get('ext') || undefined;
+        try {
+          const ws = await workspaces.ensureWorkspace(projectId);
+          // optional ext filter
+          const { listFiles } = await import('./core/project/ProjectTools');
+          const files = await listFiles(ws, ext);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'ok', data: { files } }));
+        } catch (e: any) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'error', errors: [{ code: 'files_failed', message: String(e?.message || e) }] }));
+        }
+        return;
+      }
+
       if (req.method === 'POST' && req.url === '/text/get') {
         try {
           const body = await readJson<{ projectId: string; filePath: string; ranges?: { start: number; end: number }[] }>();
           const ws = await workspaces.ensureWorkspace(body.projectId);
+          const policy = resolvePolicy(body.projectId, appConfig);
+          if (!isAllowedExtension(body.filePath, policy)) throw new Error('disallowed_extension');
           const out = await getTextFileContents(ws, body.filePath, body.ranges);
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
@@ -177,6 +219,8 @@ async function main() {
         try {
           const body = await readJson<{ projectId: string; filePath: string; baseHash: string; patches: { startLine: number; endLine: number; expectedHash: string; newText: string }[] }>();
           const ws = await workspaces.ensureWorkspace(body.projectId);
+          const policy = resolvePolicy(body.projectId, appConfig);
+          if (!isAllowedExtension(body.filePath, policy)) throw new Error('disallowed_extension');
           const out = await patchTextFileContents(ws, body.filePath, body.baseHash, body.patches);
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
