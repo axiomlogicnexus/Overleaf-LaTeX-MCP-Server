@@ -107,6 +107,16 @@ Patch shape (hash-validated, mcp-text-editor style):
   - Input: `{ projectId: string, bibPath: string, metadata: any }`
   - Output: `{ entry: string, inserted: boolean }`
 
+## Projects
+
+- list_projects
+  - Input: none
+  - Output: `{ projects: { key: string, name: string, projectId: string }[] }`
+
+- status_summary
+  - Input: `{ projectId: string }`
+  - Output: `{ projectId, hasMainTex: boolean, fileCount: number, counts: { tex, bib, images, pdf, other }, git: { isRepo: boolean, branch?: string, head?: string } }`
+
 ## Git and Overleaf Integration
 
 - list_projects | list_files | read_file | status_summary
@@ -123,6 +133,10 @@ Patch shape (hash-validated, mcp-text-editor style):
 - git_pull_push
   - Input: `{ projectId: string, policy?: { mode: "ff-only"|"rebase" } }`
   - Output: `{ pushed: boolean, summary?: any }`
+
+Policy checks:
+- Pre-commit policy enforcement scans workspace for large files and LFS pointers; violations are returned as structured errors.
+- Compile endpoints enforce allowedExtensions and allowedCompilers per project policy.
 
 - git_clone_overleaf
   - Input: `{ projectId: string, remoteUrl: string, auth: { username?: string, token?: string } }`

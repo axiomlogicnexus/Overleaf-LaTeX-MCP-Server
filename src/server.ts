@@ -213,6 +213,7 @@ async function main() {
           // Enforce policy: file extension check
           const policy = resolvePolicy(body.projectId, appConfig);
           if (!isAllowedExtension(body.rootResourcePath, policy)) throw new Error('disallowed_extension');
+          if (body.options?.compiler && !policy.allowedCompilers.includes(body.options.compiler)) throw new Error('disallowed_compiler');
           const out = await compileService.compileSync(body.projectId, body.rootResourcePath, body.options || {});
           metrics.inc('compile_requests_total');
           metrics.observe('compile_duration_ms', Date.now() - start);
@@ -233,6 +234,7 @@ async function main() {
           await workspaces.ensureWorkspace(body.projectId);
           const policy = resolvePolicy(body.projectId, appConfig);
           if (!isAllowedExtension(body.rootResourcePath, policy)) throw new Error('disallowed_extension');
+          if (body.options?.compiler && !policy.allowedCompilers.includes(body.options.compiler)) throw new Error('disallowed_compiler');
           const operationId = compileService.compileAsync(body.projectId, body.rootResourcePath, body.options || {}, ops);
           metrics.inc('compile_async_requests_total');
           res.statusCode = 200;
