@@ -265,6 +265,57 @@ async function main() {
         return;
       }
 
+      if (req.method === 'GET' && req.url === '/projects') {
+        try {
+          const projects = Object.entries(appConfig.projects).map(([key, p]) => ({ key, name: p.name, projectId: p.projectId }));
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'ok', data: { projects } }));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'error', errors: [{ code: 'projects_failed', message: String(e?.message || e) }] }));
+        }
+        return;
+      }
+
+      if (req.method === 'GET' && req.url.startsWith('/statusSummary')) {
+        const u = new URL(req.url, 'http://localhost');
+        const projectId = u.searchParams.get('projectId') || '';
+        try {
+          const ws = await workspaces.ensureWorkspace(projectId);
+          const { listFiles } = await import('./core/project/ProjectTools');
+          const files = await listFiles(ws);
+          const hasMainTex = files.includes('main.tex');
+          const counts = { tex: 0, bib: 0, images: 0, pdf: 0, other: 0 } as Record<string, number>;
+          const imgExts = new Set(['.png', '.jpg', '.jpeg', '.svg', '.eps']);
+          for (const f of files) {
+            const ext = path.extname(f).toLowerCase();
+            if (ext === '.tex') counts.tex++;
+            else if (ext === '.bib') counts.bib++;
+            else if (imgExts.has(ext)) counts.images++;
+            else if (ext === '.pdf') counts.pdf++;
+            else counts.other++;
+          }
+          const git = new GitClient(ws);
+          const isRepo = await git.isRepo();
+          let branch: string | undefined;
+          let head: string | undefined;
+          if (isRepo) {
+            try { branch = await git.currentBranch(); } catch {}
+            try { head = await git.headSha(); } catch {}
+          }
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'ok', data: { projectId, hasMainTex, fileCount: files.length, counts, git: { isRepo, branch, head } } }));
+        } catch (e: any) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'error', errors: [{ code: 'status_summary_failed', message: String(e?.message || e) }] }));
+        }
+        return;
+      }
+
       if (req.method === 'POST' && req.url === '/text/get') {
         try {
           const body = await readJson<{ projectId: string; filePath: string; ranges?: { start: number; end: number }[] }>();
