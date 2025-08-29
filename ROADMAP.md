@@ -49,17 +49,17 @@ Acceptance: compile_latex_async compiles a basic project; artifact URLs returned
 
 Phase 0.3 – Git-safe editing workflow (LLM-friendly)
 - Git wrapper (system git CLI preferred)
-  - git_start_session (clone + branch mcp-session/{uuid})
-  - git_commit_patch (hash-validated patch apply/commit, conflict detection)
-  - git_pull_push (fast-forward-only or rebase, per policy)
+  - git_start_session (clone + branch mcp-session/{uuid}) [COMPLETED]
+  - git_commit_patch (hash-validated patch apply/commit, conflict detection) [COMPLETED]
+  - git_pull_push (fast-forward-only or rebase, per policy) [COMPLETED]
   - Policies: block >10MB binaries; detect LFS; require main.tex; enforce allowedExtensions
 - Overleaf project utilities (read/inspect)
-  - list_projects (from config) and project metadata
+  - list_projects (from config) and project metadata [COMPLETED]
   - list_files (extension filter, optional projectName)
   - read_file (workspace-constrained)
-  - status_summary (project brief)
+  - status_summary (project brief) [COMPLETED]
 - Search
-  - search_content (regex/text across project with line numbers)
+  - search_content (regex/text across project with line numbers) [PLANNED]
 
 Acceptance: Safe patch commits on session branches; push respects policy; list_files/read_file/search_content return correct info.
 
