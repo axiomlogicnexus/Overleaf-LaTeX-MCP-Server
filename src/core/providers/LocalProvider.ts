@@ -62,13 +62,13 @@ function parseDiagnostics(log: string): Diagnostic[] {
         const m2 = l.match(/^(?:\.\/)?([^:]+\.tex):(\d+)/);
         if (m2) { fn = m2[1]; ln = Number(m2[2]); break; }
       }
-      diags.push({ severity: 'error', file: fn, line: ln, message });
+      diags.push({ severity: 'error', code: 'latex_error', file: fn, line: ln, message });
       continue;
     }
     // Standard LaTeX warning lines
     const warn = line.match(/^LaTeX Warning:\s*(.*)$/);
     if (warn) {
-      diags.push({ severity: 'warning', message: warn[1] });
+      diags.push({ severity: 'warning', code: 'latex_warning', message: warn[1] });
       continue;
     }
   }

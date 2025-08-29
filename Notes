@@ -1,75 +1,20 @@
-1. /compile returns "success": /compileAsync returns "success"; /compileStatus?operationId= returns "success"; /git/startSession returns "success"; /text/get (A & B) returns "success"; /git/commitPatch returns "success"; /git/pullPush returns "success"; /projects returns "success"; /statusSummary?projectId={{projectId}} returns "success"; /compile returns "success"; /health returns "success"; /capabilities returns "success"; /metrics returns "success"; /text/get (Path traversal rejection) returns "success"; /text/patch (Extension in text ops) returns "success";
+1. /compile returns "success"; /compileAsync returns "success"; /compileStatus?operationId= returns "success"; /compileAsync returns "success"; /text/get returns "success"; /text/patch returns "success"; /git/startSession returns "success"; /git/commitPatch returns "success"; /git/pullPush returns "success"; /projects returns "success";  /statusSummary?projectId=demo returns "success"; /compile with xelatex returns "success"; /health returns "success"; /capabilities returns "success"; /metrics returns "success"; /text/get(path containment violation) returns "success"; /text/get(disallowed_extension) returns "success".
 
-2. NOTE: Gemini and I discussed and edited the following:
+2. mark accomplished milestones with checkmark so I have a better overview. 
 
-"aligning the running      
-  server with the source code is the right thing to do      
-  to avoid this confusion.
+3. update applicable documents.
 
-  The project is configured to compile the TypeScript       
-  from src/ into a dist/ directory. The
-  overleaf-mcp-server/server.js file appears to be an       
-  outdated artifact.
+4. stage, commit and push.
 
-  I will proceed with building the TypeScript source        
-  code, which will generate the correct dist/server.js      
-   file. Then we can run the server from there.
+5. add MCP tool registration and diagnostics enhancements as requested.
 
-  First, let's confirm the output directory in
-  tsconfig.json.
- ╭────────────────────────────╮
- │ ✔ ReadFile tsconfig.json  │
- ╰────────────────────────────╯
-✦ Excellent. The tsconfig.json confirms that the
-  compiled output from the src directory will be placed     
-  in the dist directory.
+6. proceed with roadmap
 
-  This means the overleaf-mcp-server/server.js file is      
-   indeed an outdated artifact and is not part of the       
-  current build process. To prevent future confusion,       
-  I recommend deleting it.
+7. remember to apply future tests post-implementation
 
-  Would you like me to delete
-  overleaf-mcp-server/server.js before we proceed with      
-   building and starting the correct server?
-
-╭───────────────────────────╮
-│  > y, proceed afterwards  │"
-
-3.
-
-Update all applicable documents aswell as editing proper usage in README.md. Afterwards, stage, commit and push changes made.
-
-4.
-
-Next implementation steps
-
-Register MCP tool handlers for compile, artifacts, text patching, git session, projects, health/capabilities to match the HTTP functionality.
-Enhance diagnostics taxonomy and codes; improve file/line extraction further.
-Add binary/LFS detection to pre-receive emulation for push.
-Add list_projects and status_summary MCP tools and align API docs automatically with schemas.
-No additional input required. I will move on to MCP tool registration and diagnostics improvements next.
-
-Register MCP tools mirroring these HTTP endpoints so an MCP client can drive the flows directly.
-Add examples of projects.json with per-project policy and Overleaf Cloud remote URLs.
-
-H. Pending / planned tests
-
-Cancel operation endpoint: Pending implementation. Once added:
-POST /cancel with { "operationId": "..." } and assert state changes to cancelled, no artifacts created.
-Debounce/coalescing and concurrency limits: Pending.
-tex_outline (AST), analyze_structure, preflight, lint/format: Pending endpoints; add tests upon introduction.
-Async events (WS/SSE): Pending; test subscription and progress snapshots after implementation.
-Containerized sandbox (Docker/WSL) enforced resource limits: Pending.
-
-Also nremember to implement LLM integration when ready.
-
-
-
-
-
-
-
-
-
+cancel_operation: Introduce POST /cancel { operationId } and verify operation moves to cancelled and no artifact is created.
+Debounce/coalescing + concurrency limits: Stress compileAsync for same project and verify dedupe.
+tex_outline, analyze_structure, preflight, lint/format: Add endpoints; test AST structure and diffs/diagnostics.
+Async events (WS/SSE): Subscribe and assert operation.updated/final sequence.
+Containerized sandbox: Enforce caps and verify kills on overuse.
 
