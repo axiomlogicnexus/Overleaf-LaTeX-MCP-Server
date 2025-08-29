@@ -16,6 +16,26 @@ async function isLikelyLfsPointer(p: string): Promise<boolean> {
   }
 }
 
+async function isLikelyBinary(p: string): Promise<boolean> {
+  try {
+    const buf = await fs.readFile(p);
+    const sample = buf.subarray(0, Math.min(buf.length, 4096));
+    // Heuristic: presence of NUL or >30% non-printable bytes suggests binary
+    let nonPrintable = 0;
+    for (let i = 0; i < sample.length; i++) {
+      const b = sample[i];
+      if (b === 0) return true;
+      // printable ASCII range + common whitespace (tab/newline/carriage return)
+      if (!(b === 9 || b === 10 || b === 13 || (b >= 32 && b <= 126))) {
+        nonPrintable++;
+      }
+    }
+    return nonPrintable / sample.length > 0.3;
+  } catch {
+    return false;
+  }
+}
+
 export async function scanWorkspaceForPolicy(root: string, policy: Policy): Promise<Violation[]> {
   const violations: Violation[] = [];
   async function walk(dir: string) {
@@ -35,6 +55,9 @@ export async function scanWorkspaceForPolicy(root: string, policy: Policy): Prom
           }
           if (await isLikelyLfsPointer(p)) {
             violations.push({ code: 'lfs_pointer', path: rel, message: `File appears to be a Git LFS pointer: ${rel}` });
+          }
+          if (await isLikelyBinary(p)) {
+            violations.push({ code: 'binary_detected', path: rel, message: `Binary file detected: ${rel}` });
           }
         } catch {}
       }

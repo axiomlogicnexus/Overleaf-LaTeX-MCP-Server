@@ -167,7 +167,8 @@ export async function registerMcpTools(ctx: McpContext): Promise<McpTool[]> {
     handler: async (input: any) => {
       const body = z.object({ projectId: z.string() }).parse(input);
       const ws = await ctx.workspaces.ensureWorkspace(body.projectId);
-      const { listFiles } = await import('../project/ProjectTools');
+      const {
+        listFiles } = await import('../core/project/ProjectTools');
       const files = await listFiles(ws);
       const hasMainTex = files.includes('main.tex');
       const counts: Record<string, number> = { tex: 0, bib: 0, images: 0, pdf: 0, other: 0 };
