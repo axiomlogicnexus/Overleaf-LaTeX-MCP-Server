@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import http from 'node:http';
 import { ArtifactStore } from './core/artifacts/ArtifactStore';
+import { registerMcpTools } from './mcp/ToolRegistry';
 import { WorkspaceManager } from './core/workspace/WorkspaceManager';
 import { OperationManager } from './core/operations/OperationManager';
 import { CompileService } from './core/compile/CompileService';
@@ -97,6 +98,18 @@ async function main() {
   const compileService = new CompileService(workspaces, artifactStore);
   const metrics = new Metrics();
   const appConfig = await loadConfig(root);
+
+  // Initialize MCP tool registry (placeholder)
+  const mcpTools = await registerMcpTools({
+    compileService,
+    ops,
+    workspaces,
+    artifacts: artifactStore,
+    getCapabilities,
+    healthCheck: () => healthCheck(workspacesDir, artifactsDir),
+    appConfigRoot: root,
+  });
+  logger.info({ msg: 'MCP tools registered', tools: mcpTools.map(t => t.name) });
 
   // Minimal HTTP handler for artifacts and health/capabilities (optional)
   const server = http.createServer(async (req, res) => {
