@@ -184,6 +184,34 @@ async function main() {
         try {
           const body = await readJson<{ projectId: string; mode?: 'ff-only' | 'rebase' }>();
           const ws = await workspaces.ensureWorkspace(body.projectId);
+
+          // Policy checks before any network operation
+          const policy = resolvePolicy(body.projectId, appConfig);
+          // 1) Require main.tex presence
+          try {
+            await fs.access(path.join(ws, 'main.tex'));
+          } catch {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ status: 'error', errors: [{ code: 'missing_main_tex', message: 'main.tex not found in project root' }] }));
+            return;
+          }
+          // 2) Disallowed extensions scan
+          {
+            const { listFiles } = await import('./core/project/ProjectTools');
+            const files = await listFiles(ws);
+            const bad: string[] = [];
+            for (const f of files) {
+              if (!isAllowedExtension(f, policy)) bad.push(f);
+            }
+            if (bad.length) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ status: 'error', errors: [{ code: 'disallowed_extensions', message: 'Project contains files with disallowed extensions', details: { files: bad } }] }));
+              return;
+            }
+          }
+
           const git = new GitClient(ws);
           if (body.mode === 'rebase') await git.pullRebase('origin'); else await git.pullFFOnly('origin');
           await git.push('origin');
