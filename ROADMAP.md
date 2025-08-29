@@ -32,7 +32,7 @@ Acceptance: Server boots; get_capabilities and health.check work; code passes li
 Phase 0.2 – Compile path, async model, and artifacts (core robustness)
 - Compile pipeline (Local first, minimal)
   - ✅ compile_latex (sync) via LocalProvider using latexmk/xelatex; structured diagnostics parsing (basic)
-  - ✅ compile_latex_async with operationId; ✅ get_compile_status; cancel_operation; ✅ get_compile_artifact
+  - ✅ compile_latex_async with operationId; ✅ get_compile_status; ✅ cancel_operation; ✅ get_compile_artifact
   - Streaming log framing prepared (server-side buffering), return short-lived paths from ArtifactStore (no base64)
 - JobQueue
   - In-memory debouncing/coalescing per project; concurrency limit; queue status exposure for ops

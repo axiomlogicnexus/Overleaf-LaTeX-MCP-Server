@@ -48,9 +48,10 @@ All file paths are workspace-relative; the server enforces path containment and 
   - Input: `{ operationId: string }`
   - Output: `{ state: "queued"|"running"|"succeeded"|"failed"|"cancelled", progress?: number, diagnostics?: Diagnostic[], artifacts?: { pdfUrl?: string, logUrl?: string, synctexUrl?: string } }`
 
-- cancel_operation
+- cancel_operation (HTTP: POST /cancel)
   - Input: `{ operationId: string }`
   - Output: `{ cancelled: boolean }`
+  - Notes: If operation is queued or running, it will be marked as cancelled. Completed/failed operations are unchanged and return `cancelled: false`.
 
 - get_compile_artifact
   - Input: `{ operationId?: string, type: "pdf"|"log"|"synctex"|"aux", path?: string }`
@@ -170,11 +171,12 @@ Policy checks:
   - Input: `{ projectId: string, filePath: string, line: number }`
   - Output: `{ page: number, x: number, y: number }`
 
-## Optional HTTP endpoints
+## Optional/HTTP endpoints
 
 - GET /artifacts/:id (signed URL handler)
 - GET /metrics (Prometheus)
 - GET /health
+- POST /cancel (cancel a running/queued operation)
 
 ## Types
 

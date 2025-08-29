@@ -7,6 +7,19 @@ All notable changes to this project will be documented in this file. The format 
 - Removed Auth0 authentication to streamline usage for local and self-hosted environments.
 - Modified Git session handling to support both token-based authentication for commercial Overleaf instances and token-less access for local setups.
 
+## [0.1.2] - 2025-08-28
+### Added
+- HTTP cancel endpoint: POST /cancel to mark queued/running operations as cancelled.
+- Pre-receive emulation in /git/pullPush now includes workspace policy scan results (file size, LFS pointer, binary detection).
+- MCP tool registry scaffold and server initialization order fix for safer startup.
+- Standardized LaTeX diagnostics codes (latex_error, latex_warning).
+
+### Changed
+- ROADMAP.md updated with checkmarks for completed milestones.
+
+### Security
+- Startup warning for misconfigured root repo origin and url.*.insteadof rewrite rules.
+
 ## [0.1.1] - 2025-08-28
 ### Added
 - LocalProvider: real compile via latexmk/xelatex/pdflatex; safe spawn, timeout, basic diagnostics.
