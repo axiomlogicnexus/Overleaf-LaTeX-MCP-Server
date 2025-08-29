@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. The format adheres to Conventional Commits.
 
+## [0.1.2] - 2025-08-29
+### Changed
+- Removed Auth0 authentication to streamline usage for local and self-hosted environments.
+- Modified Git session handling to support both token-based authentication for commercial Overleaf instances and token-less access for local setups.
+
 ## [0.1.1] - 2025-08-28
 ### Added
 - LocalProvider: real compile via latexmk/xelatex/pdflatex; safe spawn, timeout, basic diagnostics.

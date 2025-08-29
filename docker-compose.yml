@@ -1,0 +1,55 @@
+services:
+  mongo:
+    image: mongo:6.0
+    container_name: mongo
+    restart: always
+    command: mongod --replSet rs0
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: |
+        mongosh --eval '
+          try {
+            rs.status();
+          } catch (e) {
+            rs.initiate({
+              _id: "rs0",
+              members: [
+                { _id: 0, host: "mongo:27017" }
+              ]
+            });
+          }
+        '
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  redis:
+    image: redis:6.2
+    container_name: redis
+    restart: always
+    volumes:
+      - redis_data:/data
+
+  overleaf:
+    image: sharelatex/sharelatex
+    container_name: overleaf
+    restart: always
+    depends_on:
+      - mongo
+      - redis
+    ports:
+      - "80:80"
+    volumes:
+      - overleaf_data:/var/lib/overleaf
+      - "/c/Program Files/MiKTeX/miktex/bin:/usr/local/texlive/bin/x86_64-linux"
+    environment:
+      - OVERLEAF_MONGO_URL=mongodb://mongo/sharelatex?replicaSet=rs0
+      - OVERLEAF_REDIS_HOST=redis
+      - OVERLEAF_APP_NAME="Overleaf Community" 
+
+volumes:
+  mongo_data:
+  redis_data:
+  overleaf_data:
