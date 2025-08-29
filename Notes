@@ -1,46 +1,8 @@
-Git session workflow
-POST /git/startSession: clone/fetch and checkout mcp-session/ or provided branch.
-POST /git/commitPatch: pre-commit policy scan (large files/LFS pointers), stage and commit, return SHA.
-POST /git/pullPush: pull (ff-only or rebase) and push.
-Project utilities
-GET /projects: list from projects.json.
-GET /statusSummary?projectId=...: summarize files and git status.
-Compile and artifacts
-POST /compile and POST /compileAsync with policy enforcement (allowedExtensions and allowedCompilers).
-GET /compileStatus?operationId=...
-GET /artifacts/:id via ArtifactStore (TTL-guarded).
-LocalProvider executes latexmk/xelatex/pdflatex with safe spawn and improved diagnostics parsing.
-Text patching
-POST /text/get and POST /text/patch with baseHash and per-hunk expectedHash.
-Caps, health, metrics
-GET /capabilities, GET /health, GET /metrics.
-Policy enforcement
-Pre-commit scan for large files and Git LFS pointers.
-Compile/text requests enforce allowed extensions and compilers based on project policy.
-Docs and change log updated
-API.md extended with /projects and /statusSummary plus policy checks.
-CHANGELOG.md updated to 0.1.1 detailing new endpoints, policy, and diagnostics.
+1. /compile returns "success": /compileAsync returns "success"; /compileStatus?operationId= returns "success"; /git/startSession returns "success"; /text/get (A & B) returns "success"; /git/commitPatch returns "success"; /git/pullPush returns "success"; /projects returns "success"; /statusSummary?projectId={{projectId}} returns "success"; /compile returns "success"; /health returns "success"; /capabilities returns "success"; /metrics returns "success"; /text/get (Path traversal rejection) returns "success"; /text/patch (Extension in text ops) returns "success";
 
+2. NOTE: Gemini and I discussed and edited the following:
 
-Next implementation steps
-
-Register MCP tool handlers for compile, artifacts, text patching, git session, projects, health/capabilities to match the HTTP functionality.
-Enhance diagnostics taxonomy and codes; improve file/line extraction further.
-Add binary/LFS detection to pre-receive emulation for push.
-Add list_projects and status_summary MCP tools and align API docs automatically with schemas.
-No additional input required. I will move on to MCP tool registration and diagnostics improvements next.
-
-If you want, I can now:
-
-Register MCP tools mirroring these HTTP endpoints so an MCP client can drive the flows directly.
-Add examples of projects.json with per-project policy and Overleaf Cloud remote URLs.
-
-
-
-
-NOTE:
-
-aligning the running      
+"aligning the running      
   server with the source code is the right thing to do      
   to avoid this confusion.
 
@@ -72,7 +34,35 @@ aligning the running
    building and starting the correct server?
 
 ╭───────────────────────────╮
-│  > y, proceed afterwards  │
+│  > y, proceed afterwards  │"
+
+3.
+
+Update all applicable documents aswell as editing proper usage in README.md. Afterwards, stage, commit and push changes made.
+
+4.
+
+Next implementation steps
+
+Register MCP tool handlers for compile, artifacts, text patching, git session, projects, health/capabilities to match the HTTP functionality.
+Enhance diagnostics taxonomy and codes; improve file/line extraction further.
+Add binary/LFS detection to pre-receive emulation for push.
+Add list_projects and status_summary MCP tools and align API docs automatically with schemas.
+No additional input required. I will move on to MCP tool registration and diagnostics improvements next.
+
+Register MCP tools mirroring these HTTP endpoints so an MCP client can drive the flows directly.
+Add examples of projects.json with per-project policy and Overleaf Cloud remote URLs.
+
+H. Pending / planned tests
+
+Cancel operation endpoint: Pending implementation. Once added:
+POST /cancel with { "operationId": "..." } and assert state changes to cancelled, no artifacts created.
+Debounce/coalescing and concurrency limits: Pending.
+tex_outline (AST), analyze_structure, preflight, lint/format: Pending endpoints; add tests upon introduction.
+Async events (WS/SSE): Pending; test subscription and progress snapshots after implementation.
+Containerized sandbox (Docker/WSL) enforced resource limits: Pending.
+
+Also nremember to implement LLM integration when ready.
 
 
 
@@ -80,4 +70,6 @@ aligning the running
 
 
 
-/compile returns "success": /compileAsync returns "success"; /compileStatus?operationId= returns "success"; /git/startSession returns "success"; /text/get (A & B) returns "success"; 
+
+
+
