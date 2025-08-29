@@ -149,7 +149,7 @@ Acceptance: Capabilities clearly surfaced; dev tooling generates docs; governanc
 
 
 Phase 1.0 – Multi-tenant, authZ and production readiness (hardest/high value)
-- Multi-tenant RBAC
+- Multi-tenant RBAC (optional; if added later)
   - Separate read/compile permissions; signed URLs for artifacts; project_id scoping everywhere
 - Versioning & rollback
   - Compile from commit SHA; compile previous commit for regression checks
@@ -159,6 +159,8 @@ Phase 1.0 – Multi-tenant, authZ and production readiness (hardest/high value)
   - Docker images; docker-compose; Helm chart; pre-warmed TeXLive layer
 - SLA & docs
   - Supported TeXLive year/package policy; quotas; rate limits; SLA for timeouts and storage
+- Auth de-scoping
+  - No Auth0/SSO. Git credentials are passed via remote URLs/credential helpers for Overleaf Cloud, or omitted for self-hosted/local.
 
 Acceptance: Secure multi-tenant operation with artifact storage; documented SLA; production deploy artifacts.
 

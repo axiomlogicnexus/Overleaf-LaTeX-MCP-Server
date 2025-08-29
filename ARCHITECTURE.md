@@ -42,6 +42,10 @@ Primary language: TypeScript/Node.js. Optional Python sidecar for LaTeX-specific
   - Metrics: Prometheus counters/histograms for compile duration, queue depth, memory, git errors, artifact bytes.
   - Tracing: OpenTelemetry spans for git, compile, artifact writes.
 
+- Auth & credentials
+  - No Auth0/SSO. Credentials for Overleaf Cloud Git (username/token) are supplied via remote URL or OS credential helper at clone time.
+  - Self-hosted/local usage does not require tokens if working directly with local workspaces.
+
 - Python sidecar (optional)
   - Exposes minimal RPC for chktex, latexindent, pdf.info/optimize.
   - Invoked by core; receives normalized paths and bounded inputs.

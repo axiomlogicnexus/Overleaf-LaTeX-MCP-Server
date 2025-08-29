@@ -15,6 +15,7 @@ Build a secure, robust, and intelligent Overleaf LaTeX MCP Server in TypeScript 
 - Provide a full web UI; scope is MCP tool surface (optional minimal HTTP endpoints only).
 - Runtime TeX package installation on host (tex.pkg_install is gated and container-only if ever enabled).
 - Desktop editor integration (e.g., TeXstudio) in production surfaces.
+- Third-party authentication providers (Auth0/SSO) are not in scope.
 
 ## Users and Use Cases
 - LLM clients: drive compile/edit flows, receive structured diagnostics.

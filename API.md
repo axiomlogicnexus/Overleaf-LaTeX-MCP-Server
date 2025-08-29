@@ -9,6 +9,17 @@ Long-running tools return `{ operationId }` and progress is available via `get_o
 
 All file paths are workspace-relative; the server enforces path containment and policy checks. Large artifacts (PDF/log/synctex) are delivered via short-lived signed URLs from the ArtifactStore.
 
+## Authentication & credentials
+
+- No Auth0/SSO usage. This server does not implement third-party identity providers.
+- Overleaf Cloud Git access:
+  - Supply a remote URL including credentials or use a credential helper. Example: https://<username>:<token>@git.overleaf.com/<project-id>
+  - Never log tokens; the server masks secrets in logs. Prefer OS credential stores.
+- Self-hosted/local:
+  - Git tokens are not required if you operate on local workspaces (workspaces/<projectId>). You can copy project files directly.
+- Configuration:
+  - projects.json may include per-project gitUrl (remote) and projectId. Tokens are not stored; pass via URL or OS credential store at clone time.
+
 ## Core
 
 - get_capabilities
