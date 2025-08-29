@@ -19,8 +19,8 @@ Phase 0.1 – Bootstrap core (foundation, easiest, highest value)
   - JobQueue (in-memory stub, single worker)
   - ArtifactStore (local disk with TTL metadata stub)
 - Initial MCP tools (sync, minimal)
-  - get_capabilities (reports providers and policies)
-  - health.check
+  - get_capabilities (reports providers and policies) [COMPLETED]
+  - health.check [COMPLETED]
   - config.show, config.validate, config.reload
 - Docs
   - Populate global_rules.md, ARCHITECTURE.md (components and data-flow), API.md (tool schemas draft), DEVELOPMENT.md (dev setup), PRD.md (scope/constraints), CHANGELOG.md (initial)
@@ -31,17 +31,17 @@ Acceptance: Server boots; get_capabilities and health.check work; code passes li
 
 Phase 0.2 – Compile path, async model, and artifacts (core robustness)
 - Compile pipeline (Local first, minimal)
-  - compile_latex (sync) via LocalProvider using latexmk/xelatex; structured diagnostics parsing (basic)
-  - compile_latex_async with operationId; get_compile_status; cancel_operation; get_compile_artifact
+  - compile_latex (sync) via LocalProvider using latexmk/xelatex; structured diagnostics parsing (basic) [COMPLETED]
+  - compile_latex_async with operationId [COMPLETED]; get_compile_status [COMPLETED]; cancel_operation; get_compile_artifact [COMPLETED]
   - Streaming log framing prepared (server-side buffering), return short-lived paths from ArtifactStore (no base64)
 - JobQueue
   - In-memory debouncing/coalescing per project; concurrency limit; queue status exposure for ops
 - ArtifactStore
-  - File-backed store on tmp with TTL cleanup; signed ephemeral URLs (local HTTP handler)
+  - File-backed store on tmp with TTL cleanup; signed ephemeral URLs (local HTTP handler) [COMPLETED]
 - Document intelligence (fast)
   - tex_outline (latex-utensils): sections/labels/citations/environments tree
 - File/text utilities
-  - get_text_file_contents, patch_text_file_contents (hash-validated, mcp-text-editor semantics)
+  - get_text_file_contents, patch_text_file_contents (hash-validated, mcp-text-editor semantics) [COMPLETED]
   - text.replace, text.apply_patch (alias/shim for the above)
 
 Acceptance: compile_latex_async compiles a basic project; artifact URLs returned; tex_outline works; patching is hash-validated and safe.
@@ -49,17 +49,17 @@ Acceptance: compile_latex_async compiles a basic project; artifact URLs returned
 
 Phase 0.3 – Git-safe editing workflow (LLM-friendly)
 - Git wrapper (system git CLI preferred)
-  - git_start_session (clone + branch mcp-session/{uuid})
-  - git_commit_patch (hash-validated patch apply/commit, conflict detection)
-  - git_pull_push (fast-forward-only or rebase, per policy)
+  - git_start_session (clone + branch mcp-session/{uuid}) [COMPLETED]
+  - git_commit_patch (hash-validated patch apply/commit, conflict detection) [COMPLETED]
+  - git_pull_push (fast-forward-only or rebase, per policy) [COMPLETED]
   - Policies: block >10MB binaries; detect LFS; require main.tex; enforce allowedExtensions
 - Overleaf project utilities (read/inspect)
-  - list_projects (from config) and project metadata
+  - list_projects (from config) and project metadata [COMPLETED]
   - list_files (extension filter, optional projectName)
   - read_file (workspace-constrained)
-  - status_summary (project brief)
+  - status_summary (project brief) [COMPLETED]
 - Search
-  - search_content (regex/text across project with line numbers)
+  - search_content (regex/text across project with line numbers) [PLANNED]
 
 Acceptance: Safe patch commits on session branches; push respects policy; list_files/read_file/search_content return correct info.
 
