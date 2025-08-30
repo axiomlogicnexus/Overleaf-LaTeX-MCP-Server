@@ -184,6 +184,49 @@ Policy checks:
     - mcp.list_tools → { tools: [{ name, description }] }
     - mcp.invoke { tool, input } → { result }
 
+#### WebSocket examples
+
+List tools
+Frame:
+```
+{ "id": "1", "method": "mcp.list_tools", "params": {} }
+```
+Response:
+```
+{ "id": "1", "result": { "tools": [ { "name": "overleaf.compile_latex", "description": "..." }, ... ] } }
+```
+
+Invoke compile (async)
+Frame:
+```
+{
+  "id": "2",
+  "method": "mcp.invoke",
+  "params": {
+    "tool": "overleaf.compile_latex_async",
+    "input": { "projectId": "demo", "rootResourcePath": "main.tex", "options": { "compiler": "latexmk" } }
+  }
+}
+```
+Response:
+```
+{ "id": "2", "result": { "operationId": "..." } }
+```
+
+Get compile status
+Frame:
+```
+{
+  "id": "3",
+  "method": "mcp.invoke",
+  "params": { "tool": "overleaf.get_compile_status", "input": { "operationId": "..." } }
+}
+```
+Response:
+```
+{ "id": "3", "result": { "id": "...", "state": "queued|running|succeeded|failed|cancelled", "result": { ... } } }
+```
+
 ### MCP bridge examples
 
 List tools
