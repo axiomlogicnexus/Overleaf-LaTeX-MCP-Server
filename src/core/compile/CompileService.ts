@@ -7,6 +7,9 @@ import { OperationManager } from '../operations/OperationManager';
 import fs from 'node:fs/promises';
 
 export class CompileService {
+  // Dedup map: key = `${workspaceId}::${rootResourcePath}`
+  private pending = new Map<string, string>();
+
   constructor(
     private readonly workspaces: WorkspaceManager,
     private readonly artifacts: ArtifactStore,
@@ -33,10 +36,19 @@ export class CompileService {
   }
 
   compileAsync(workspaceId: string, rootResourcePath: string, options: CompileOptions, ops: OperationManager<any, any>): string {
+    const key = `${workspaceId}::${rootResourcePath}`;
+    const existing = this.pending.get(key);
+    if (existing) {
+      const op = ops.get(existing);
+      if (op && (op.state === 'queued' || op.state === 'running')) {
+        return existing;
+      }
+    }
     const id = ops.create({ workspaceId, rootResourcePath, options }, async () => {
       const out = await this.compileSync(workspaceId, rootResourcePath, options);
       return out;
     });
+    this.pending.set(key, id);
     return id;
   }
 }

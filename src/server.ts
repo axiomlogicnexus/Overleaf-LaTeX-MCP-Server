@@ -75,6 +75,25 @@ async function healthCheck(workspacesDir: string, artifactsDir: string) {
   return checks;
 }
 
+async function warnIfMisconfiguredRemote(root: string) {
+  try {
+    const rem = await run('git', ['remote', '-v'], root);
+    const lines = rem.stdout.split(/\r?\n/).filter(Boolean);
+    const origin = lines.find(l => l.startsWith('origin')) || '';
+    if (!origin.includes('github.com/axiomlogicnexus/Overleaf-LaTeX-MCP-Server')) {
+      // eslint-disable-next-line no-console
+      console.warn('[WARN] Top-level repo origin does not point to GitHub. Current:', origin);
+    }
+    const cfg = await run('git', ['config', '--global', '-l'], root);
+    if (/url\..*insteadof=.*localhost|overleaf/i.test(cfg.stdout)) {
+      // eslint-disable-next-line no-console
+      console.warn('[WARN] Detected url.*.insteadof that may rewrite GitHub to localhost/Overleaf.');
+    }
+  } catch {
+    // ignore
+  }
+}
+
 async function main() {
   logger.info({ msg: 'Overleaf LaTeX MCP Server starting' });
 
@@ -87,6 +106,8 @@ async function main() {
 
   const caps = await getCapabilities();
   logger.info({ msg: 'Capabilities detected', caps });
+
+  await warnIfMisconfiguredRemote(root);
 
   const health = await healthCheck(workspacesDir, artifactsDir);
   logger.info({ msg: 'Health check', health });
@@ -225,6 +246,17 @@ async function main() {
             }
           }
 
+          // 3) Workspace policy scan for size/LFS/binary
+          {
+            const v = await scanWorkspaceForPolicy(ws, policy);
+            if (v.length) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ status: 'error', errors: v.map(x => ({ code: x.code, message: x.message, details: { path: x.path, sizeBytes: x.sizeBytes } })) }));
+              return;
+            }
+          }
+
           const git = new GitClient(ws);
           if (body.mode === 'rebase') await git.pullRebase('origin'); else await git.pullFFOnly('origin');
           await git.push('origin');
@@ -297,6 +329,71 @@ async function main() {
         res.setHeader('Content-Type', 'application/json');
         if (!op) { res.end(JSON.stringify({ status: 'error', errors: [{ code: 'not_found', message: 'operation not found' }] })); return; }
         res.end(JSON.stringify({ status: 'ok', data: op }));
+        return;
+      }
+
+      if (req.method === 'POST' && req.url === '/cancel') {
+        try {
+          const body = await readJson<{ operationId: string }>();
+          const op = ops.get(body.operationId);
+          if (!op) {
+            res.statusCode = 404;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ status: 'error', errors: [{ code: 'not_found', message: 'operation not found' }] }));
+            return;
+          }
+          if (op.state === 'queued' || op.state === 'running') {
+            op.state = 'cancelled';
+          }
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'ok', data: { cancelled: op.state === 'cancelled' } }));
+        } catch (e: any) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'error', errors: [{ code: 'cancel_failed', message: String(e?.message || e) }] }));
+        }
+        return;
+      }
+
+      if (req.method === 'GET' && req.url === '/mcp/tools') {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ status: 'ok', data: mcpTools.map(t => ({ name: t.name, description: t.description })) }));
+        return;
+      }
+
+      if (req.method === 'POST' && req.url === '/mcp/invoke') {
+        try {
+          const body = await readJson<{ tool: string; input?: any }>();
+          const tool = mcpTools.find(t => t.name === body.tool);
+          if (!tool) {
+            res.statusCode = 404;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ status: 'error', errors: [{ code: 'tool_not_found', message: `No such tool: ${body.tool}` }] }));
+            return;
+          }
+          // Validate input if schema provided (assume zod)
+          let parsed = body.input ?? {};
+          try {
+            if (tool.inputSchema && typeof tool.inputSchema.parse === 'function') {
+              parsed = tool.inputSchema.parse(body.input ?? {});
+            }
+          } catch (e: any) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ status: 'error', errors: [{ code: 'invalid_request', message: String(e?.message || e) }] }));
+            return;
+          }
+          const result = await tool.handler(parsed);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'ok', data: result }));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'error', errors: [{ code: 'invoke_failed', message: String(e?.message || e) }] }));
+        }
         return;
       }
 

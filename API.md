@@ -177,6 +177,8 @@ Policy checks:
 - GET /metrics (Prometheus)
 - GET /health
 - POST /cancel (cancel a running/queued operation)
+- GET /mcp/tools (list bridged MCP tools)
+- POST /mcp/invoke (invoke a tool by name with JSON input)
 
 ## Types
 
