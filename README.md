@@ -172,9 +172,12 @@ J) Security checks
 
 ## LLM Integration (current state)
 
-- The server currently exposes HTTP endpoints; upcoming work will register MCP tools mirroring these endpoints.
-- To integrate with an LLM that supports function calling/tools, map your tool definitions to these HTTP endpoints (method + URL + JSON schema) and pass/return structured JSON.
-- Once MCP tool registration is added, MCP clients can connect directly without an HTTP shim.
+- The server currently exposes HTTP endpoints; a minimal MCP HTTP bridge is available.
+- To exercise the same handlers via the bridge:
+  - GET /mcp/tools → lists tool names and descriptions
+  - POST /mcp/invoke with body `{ "tool": "<name>", "input": { ... } }`
+- For LLMs with function-calling, map tools to /mcp/invoke with JSON schema validation.
+- Upcoming work: proper MCP transport so MCP-enabled clients can discover and invoke tools directly (no HTTP shim required).
 
 ## Next Steps (high level)
 

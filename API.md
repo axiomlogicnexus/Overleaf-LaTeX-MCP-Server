@@ -180,6 +180,84 @@ Policy checks:
 - GET /mcp/tools (list bridged MCP tools)
 - POST /mcp/invoke (invoke a tool by name with JSON input)
 
+### MCP bridge examples
+
+List tools
+- GET /mcp/tools
+- Response:
+```
+{
+  "status": "ok",
+  "data": [
+    { "name": "overleaf.compile_latex", "description": "..." },
+    { "name": "overleaf.compile_latex_async", "description": "..." }
+  ]
+}
+```
+
+Invoke compile (sync)
+- POST /mcp/invoke
+- Body:
+```
+{
+  "tool": "overleaf.compile_latex",
+  "input": {
+    "projectId": "demo",
+    "rootResourcePath": "main.tex",
+    "options": { "compiler": "latexmk" }
+  }
+}
+```
+- Response:
+```
+{
+  "status": "ok",
+  "data": {
+    "diagnostics": [ ... ],
+    "artifacts": { "pdfUrl": "/artifacts/<id>", "logUrl": "/artifacts/<id>" }
+  }
+}
+```
+
+Invoke compile (async)
+- POST /mcp/invoke
+- Body:
+```
+{
+  "tool": "overleaf.compile_latex_async",
+  "input": {
+    "projectId": "demo",
+    "rootResourcePath": "main.tex",
+    "options": { "compiler": "latexmk" }
+  }
+}
+```
+- Response:
+```
+{ "status": "ok", "data": { "operationId": "..." } }
+```
+
+Get compile status
+- POST /mcp/invoke
+- Body:
+```
+{
+  "tool": "overleaf.get_compile_status",
+  "input": { "operationId": "..." }
+}
+```
+- Response:
+```
+{
+  "status": "ok",
+  "data": {
+    "id": "...",
+    "state": "queued|running|succeeded|failed|cancelled",
+    "result": { "diagnostics": [ ... ], "artifacts": { ... } }
+  }
+}
+```
+
 ## Types
 
 - Diagnostic, Diff, OutlineNode, SectionNode, Node, FilePatch, Patch

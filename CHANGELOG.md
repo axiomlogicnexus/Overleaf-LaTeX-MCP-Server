@@ -7,6 +7,14 @@ All notable changes to this project will be documented in this file. The format 
 - Removed Auth0 authentication to streamline usage for local and self-hosted environments.
 - Modified Git session handling to support both token-based authentication for commercial Overleaf instances and token-less access for local setups.
 
+## [0.1.3] - 2025-08-29
+### Added
+- MCP HTTP bridge endpoints: GET /mcp/tools and POST /mcp/invoke, to list and invoke MCP tools with JSON input validation.
+- Compile coalescing: repeated compileAsync calls for the same project/root return the same operationId while a job is queued/running.
+
+### Docs
+- API.md and README.md updated with MCP bridge examples and invocation bodies.
+
 ## [0.1.2] - 2025-08-28
 ### Added
 - HTTP cancel endpoint: POST /cancel to mark queued/running operations as cancelled.
