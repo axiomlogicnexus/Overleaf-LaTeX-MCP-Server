@@ -177,6 +177,8 @@ Policy checks:
 - GET /metrics (Prometheus)
 - GET /health
 - POST /cancel (cancel a running/queued operation)
+  - On queued/running: aborts compile via AbortSignal and returns { cancelled: true }
+  - On terminal ops: returns { cancelled: false }
 - GET /mcp/tools (list bridged MCP tools)
 - POST /mcp/invoke (invoke a tool by name with JSON input)
 - WebSocket MCP bridge: ws://<host>:<port>/mcp/ws

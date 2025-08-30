@@ -44,9 +44,23 @@ export class CompileService {
         return existing;
       }
     }
-    const id = ops.create({ workspaceId, rootResourcePath, options }, async () => {
-      const out = await this.compileSync(workspaceId, rootResourcePath, options);
-      return out;
+    const id = ops.create({ workspaceId, rootResourcePath, options }, async (_inp, signal) => {
+      const wsPath = await this.workspaces.ensureWorkspace(workspaceId);
+      const provider = new LocalProvider();
+      const result = await provider.compile(wsPath, rootResourcePath, options, signal);
+      const urls: { pdfUrl?: string; logUrl?: string; synctexUrl?: string } = {};
+      if (result.artifacts?.pdfPath) {
+        const ref = this.artifacts.putExisting(result.artifacts.pdfPath);
+        urls.pdfUrl = this.artifacts.signUrl(ref).url;
+      }
+      if (result.artifacts?.logPath) {
+        const ref = this.artifacts.putExisting(result.artifacts.logPath);
+        urls.logUrl = this.artifacts.signUrl(ref).url;
+      }
+      if (result.artifacts?.synctexPath) {
+        try { await fs.access(result.artifacts.synctexPath); const ref = this.artifacts.putExisting(result.artifacts.synctexPath); urls.synctexUrl = this.artifacts.signUrl(ref).url; } catch {}
+      }
+      return { result, artifacts: urls };
     });
     this.pending.set(key, id);
     return id;

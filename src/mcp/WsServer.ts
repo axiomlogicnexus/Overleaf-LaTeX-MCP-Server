@@ -1,12 +1,12 @@
 import type { Server as HttpServer } from 'http';
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocketServer, WebSocket, RawData } from 'ws';
 import type { McpTool } from './ToolRegistry';
 
 export function startMcpWsServer(httpServer: HttpServer, tools: McpTool[], path = '/mcp/ws') {
   const wss = new WebSocketServer({ server: httpServer, path });
 
   wss.on('connection', (ws: WebSocket) => {
-    ws.on('message', async (data) => {
+    ws.on('message', async (data: RawData, isBinary: boolean) => {
       try {
         const msg = JSON.parse(data.toString());
         const { id, method, params } = msg;

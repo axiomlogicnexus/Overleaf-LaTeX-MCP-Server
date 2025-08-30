@@ -24,5 +24,5 @@ export type CompileResult = {
 };
 
 export interface CompileProvider {
-  compile(projectPath: string, rootResourcePath: string, options: CompileOptions): Promise<CompileResult>;
+  compile(projectPath: string, rootResourcePath: string, options: CompileOptions, signal?: AbortSignal): Promise<CompileResult>;
 }

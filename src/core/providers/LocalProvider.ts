@@ -3,17 +3,18 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { CompileProvider, CompileOptions, CompileResult, Diagnostic } from './CompileProvider';
 
-function run(cmd: string, args: string[], cwd: string, timeoutMs: number): Promise<{ code: number; stdout: string; stderr: string; timedOut: boolean }> {
+function run(cmd: string, args: string[], cwd: string, timeoutMs: number, signal?: AbortSignal): Promise<{ code: number; stdout: string; stderr: string; timedOut: boolean; aborted: boolean }> {
   return new Promise((resolve) => {
-    const child = spawn(cmd, args, { cwd, shell: false });
+    const child = spawn(cmd, args, { cwd, shell: false, signal });
     let stdout = '';
     let stderr = '';
     let settled = false;
+    let aborted = false;
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
       try { child.kill('SIGKILL'); } catch {}
-      resolve({ code: -1, stdout, stderr: stderr + `\n<timeout after ${timeoutMs}ms>`, timedOut: true });
+      resolve({ code: -1, stdout, stderr: stderr + `\n<timeout after ${timeoutMs}ms>`, timedOut: true, aborted });
     }, timeoutMs);
 
     child.stdout.on('data', (d) => (stdout += d.toString()));
@@ -22,14 +23,20 @@ function run(cmd: string, args: string[], cwd: string, timeoutMs: number): Promi
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve({ code: -1, stdout, stderr: String(err), timedOut: false });
+      resolve({ code: -1, stdout, stderr: String(err), timedOut: false, aborted });
     });
     child.on('close', (code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve({ code: code ?? -1, stdout, stderr, timedOut: false });
+      resolve({ code: code ?? -1, stdout, stderr, timedOut: false, aborted });
     });
+  if (signal) {
+      signal.addEventListener('abort', () => {
+        try { child.kill('SIGKILL'); } catch {}
+        aborted = true;
+      }, { once: true });
+    }
   });
 }
 
@@ -79,7 +86,7 @@ function parseDiagnostics(log: string): Diagnostic[] {
 }
 
 export class LocalProvider implements CompileProvider {
-  async compile(projectPath: string, rootResourcePath: string, options: CompileOptions): Promise<CompileResult> {
+  async compile(projectPath: string, rootResourcePath: string, options: CompileOptions, signal?: AbortSignal): Promise<CompileResult> {
     const timeoutMs = Math.max(1000, options.timeoutMs ?? 120000);
     const compilerPref = options.compiler ?? 'latexmk';
 
@@ -113,7 +120,7 @@ export class LocalProvider implements CompileProvider {
       args = ['-interaction=nonstopmode', '-file-line-error', '-synctex=1', mainRel, ...extraArgs];
     }
 
-    const { code, stdout, stderr, timedOut } = await run(bin, args, projectPath, timeoutMs);
+    const { code, stdout, stderr, timedOut, aborted } = await run(bin, args, projectPath, timeoutMs, signal);
     const combined = [stdout, stderr].filter(Boolean).join('\n');
 
     const logsDir = path.resolve(projectPath, '.mcp-logs');
@@ -124,6 +131,10 @@ export class LocalProvider implements CompileProvider {
     const pdfPath = path.resolve(projectPath, `${mainBase}.pdf`);
 
     const diags = parseDiagnostics(combined);
+    if (signal?.aborted || aborted) {
+      diags.unshift({ severity: 'info', code: 'cancelled', message: 'Compilation cancelled' });
+      return { diagnostics: diags };
+    }
     if (timedOut) {
       diags.unshift({ severity: 'error', code: 'timeout', message: `Compilation timed out after ${timeoutMs}ms` });
     }

@@ -343,12 +343,10 @@ async function main() {
             res.end(JSON.stringify({ status: 'error', errors: [{ code: 'not_found', message: 'operation not found' }] }));
             return;
           }
-          if (op.state === 'queued' || op.state === 'running') {
-            op.state = 'cancelled';
-          }
+          const cancelled = ops.cancel(body.operationId);
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ status: 'ok', data: { cancelled: op.state === 'cancelled' } }));
+          res.end(JSON.stringify({ status: 'ok', data: { cancelled } }));
         } catch (e: any) {
           res.statusCode = 400;
           res.setHeader('Content-Type', 'application/json');
