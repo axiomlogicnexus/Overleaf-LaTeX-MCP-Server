@@ -278,6 +278,12 @@ async function main() {
         res.end(metrics.renderProm());
         return;
       }
+      if (req.method === 'GET' && req.url === '/queue') {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ status: 'ok', data: ops.summary() }));
+        return;
+      }
 
       if (req.method === 'POST' && req.url === '/compile') {
         try {

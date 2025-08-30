@@ -1,0 +1,3 @@
+/compileAsync returns "success";
+/cancel returns "success";
+/compileStatus?operationId= "success"; /compileAsync returns "success"; 
