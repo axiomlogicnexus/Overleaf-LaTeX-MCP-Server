@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import http from 'node:http';
+import { startMcpWsServer } from './mcp/WsServer';
 import { ArtifactStore } from './core/artifacts/ArtifactStore';
 import { registerMcpTools } from './mcp/ToolRegistry';
 import { WorkspaceManager } from './core/workspace/WorkspaceManager';
@@ -525,6 +526,8 @@ async function main() {
   });
   const port = Number(process.env.PORT || 8080);
   server.listen(port, () => logger.info({ msg: 'HTTP server listening', port }));
+  // Start WS MCP bridge
+  startMcpWsServer(server, mcpTools, '/mcp/ws');
 
   // TODO: Register MCP tools, wire providers, queue, artifact store
   process.on('SIGINT', () => {

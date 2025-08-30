@@ -179,6 +179,10 @@ Policy checks:
 - POST /cancel (cancel a running/queued operation)
 - GET /mcp/tools (list bridged MCP tools)
 - POST /mcp/invoke (invoke a tool by name with JSON input)
+- WebSocket MCP bridge: ws://<host>:<port>/mcp/ws
+  - Methods:
+    - mcp.list_tools → { tools: [{ name, description }] }
+    - mcp.invoke { tool, input } → { result }
 
 ### MCP bridge examples
 
